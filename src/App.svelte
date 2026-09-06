@@ -1,8 +1,11 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, mount } from "svelte";
   import L from "leaflet";
   import "leaflet/dist/leaflet.css";
-  import { loadPeople } from "./datastore.js";
+  import { loadPeople, loadTestimonials } from "./datastore.js";
+  import PopupTimeline from "./PopupTimeline.svelte";
+  import TestimonialsTimeline from "./TestimonialsTimeline.svelte";
+  import Network from "./Network.svelte";
 
   const MARKER_COLOR = "black";
   const MIN_RADIUS = 3;
@@ -10,6 +13,7 @@
 
   let mapEl;
   let status = "Loading…";
+  let testimonialsData = null;
 
   // reserved for driving a future D3 chart's scales; unused by the Leaflet map itself
   let width = 0;
@@ -38,9 +42,21 @@
         return `${personName(e.person)}${degrees ? ` (${degrees})` : ""}${range ? ` — ${range}` : ""}`;
       })
       .join("</li><li>");
-    return `<div class="popup-name">${name}</div>
-    <div class="popup-event">${entries.length} student${entries.length === 1 ? "" : "s"}</div>
-    <ul class="popup-list"><li>${names}</li></ul>`;
+
+    const container = document.createElement("div");
+    container.innerHTML = `<div class="popup-name">${name}</div>
+    <div class="popup-event">${entries.length} student${entries.length === 1 ? "" : "s"}</div>`;
+
+    const timelineEl = document.createElement("div");
+    container.appendChild(timelineEl);
+    mount(PopupTimeline, { target: timelineEl, props: { entries } });
+
+    const list = document.createElement("ul");
+    list.className = "popup-list";
+    list.innerHTML = `<li>${names}</li>`;
+    container.appendChild(list);
+
+    return container;
   }
 
   onMount(() => {
@@ -94,7 +110,7 @@
               weight: 1,
             },
           );
-          marker.bindPopup(popupFor(key, group.entries));
+          marker.bindPopup(popupFor(key, group.entries), { maxWidth: 320 });
           markerLayer.addLayer(marker);
         });
 
@@ -109,31 +125,60 @@
         console.error(err);
       });
 
+    loadTestimonials()
+      .then((testimonials) => {
+        testimonialsData = testimonials;
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+
     return () => {
       map.remove();
     };
   });
 </script>
 
-<div id="toolbar">
+<!-- <div id="toolbar">
   <h1>Universities Awarding M.D. Degrees</h1>
   <div id="status">{status}</div>
-</div>
+</div> -->
 
+<h4>M.D. Degrees Awarded to St Andrews alumni by other universities:</h4>
 <div
   id="map"
   bind:this={mapEl}
   bind:clientWidth={width}
   bind:clientHeight={height}
 ></div>
+<h4>M.D. Degrees on Testimonials in St Andrews per year:</h4>
+<div id="testimonials">
+  {#if testimonialsData}
+    <TestimonialsTimeline people={testimonialsData} />
+  {/if}
+</div>
+
+<!-- <div id="network">
+  {#if testimonialsData}
+    <Network people={testimonialsData} />
+  {/if}
+</div> -->
 
 <style>
   #map {
-    position: absolute;
-    top: 48px;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    position: relative;
+    width: 100%;
+    height: 70vh;
+  }
+  #testimonials {
+    position: relative;
+    width: 100%;
+    height: 300px;
+  }
+  #network {
+    position: relative;
+    width: 100%;
+    height: 300px;
   }
   #toolbar {
     height: 48px;
