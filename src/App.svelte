@@ -1,11 +1,42 @@
 <script>
   import { onMount, mount } from "svelte";
+  import { groups } from "d3";
   import L from "leaflet";
   import "leaflet/dist/leaflet.css";
-  import { loadPeople, loadTestimonials } from "./datastore.js";
-  import PopupTimeline from "./PopupTimeline.svelte";
-  import TestimonialsTimeline from "./TestimonialsTimeline.svelte";
-  import Network from "./Network.svelte";
+  import { loadPeople, loadTestimonials, loadStAndrews } from "./datastore.js";
+  import PopupTimeline from "./libs/PopupTimeline.svelte";
+  import TestimonialsTimeline from "./libs/TestimonialsTimeline.svelte";
+  import Network from "./libs/Network.svelte";
+
+  // all md (gained in st andrews and elsewhere)
+  // just st andrews : 3758
+  // just elsewhere : 391 (including Hon. M.D., M.D. et Phil.)
+  // idp1379293124
+  // idp1393191556
+  // idp1374816476
+  // idp1374916524
+  // idp1407537140
+  // idp1412748908
+  // idp1395590356
+  // idp1388412484
+  // idp1417348676
+  // idp1388840492
+  // W_0127_Watson_John_WatsonusWatsone.xml
+  //                  380 (just M.D.)
+
+  // Degree Award Type	Count
+  // By examination	2,427
+  // On testimonials	1,191
+  // Unspecified	75
+  // Gratis	23
+  // Gratis and on testimonials	12
+  // By examination and on testimonials	12
+  // By examination and gratis	5
+  // Honorary	8
+  // On recommendation	2
+  // By thesis	1
+  // In eundem	1
+  // On personal knowledge and testimonial	1
 
   const MARKER_COLOR = "black";
   const MIN_RADIUS = 3;
@@ -14,6 +45,7 @@
   let mapEl;
   let status = "Loading…";
   let testimonialsData = null;
+  let stAndrewsData = null;
 
   // reserved for driving a future D3 chart's scales; unused by the Leaflet map itself
   let width = 0;
@@ -27,6 +59,20 @@
   function isMD(degreeName) {
     if (!degreeName) return false;
     return degreeName.replace(/[.\s]/g, "").toLowerCase() === "md";
+  }
+
+  // collapse degree_award phrasings that only differ in word order/pluralization
+  const DEGREE_AWARD_ALIASES = {
+    "after examination": "by examination",
+    "on testimonials and by examination": "by examination and on testimonials",
+    "on testimonials and gratis": "gratis and on testimonials",
+    "gratis on testimonials": "gratis and on testimonials",
+    "on recommendations": "on recommendation",
+  };
+
+  function normalizeDegreeAward(degreeAward) {
+    if (!degreeAward) return "Unspecified";
+    return DEGREE_AWARD_ALIASES[degreeAward] || degreeAward;
   }
 
   // radius grows with sqrt(count) so marker area scales linearly with attendee count
@@ -60,7 +106,7 @@
   }
 
   onMount(() => {
-    const map = L.map(mapEl).setView([56.34, -2.8], 6);
+    const map = L.map(mapEl).setView([53.54, -2.8], 6);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution:
@@ -72,6 +118,8 @@
     loadPeople()
       .then((people) => {
         // group other_universities entries by official_name
+        console.log(people);
+
         const groups = new Map();
         people.forEach((p) => {
           (p.other_universities || []).forEach((u) => {
@@ -133,6 +181,25 @@
         console.error(err);
       });
 
+    loadStAndrews()
+      .then((stAndrews) => {
+        console.log(stAndrews);
+        stAndrewsData = stAndrews;
+
+        const degreeEntries = stAndrews.flatMap((p) =>
+          ((p.study && p.study.degrees) || [])
+            .filter((d) => isMD(d.name))
+            .map((d) => ({ ...d, person: p })),
+        );
+        const byDegreeAward = groups(degreeEntries, (d) =>
+          normalizeDegreeAward(d.degree_award),
+        );
+        console.log(byDegreeAward);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+
     return () => {
       map.remove();
     };
@@ -151,10 +218,10 @@
   bind:clientWidth={width}
   bind:clientHeight={height}
 ></div>
-<h4>M.D. Degrees on Testimonials in St Andrews per year:</h4>
+<h4>M.D. Degrees Awarded in St Andrews per year:</h4>
 <div id="testimonials">
-  {#if testimonialsData}
-    <TestimonialsTimeline people={testimonialsData} />
+  {#if stAndrewsData}
+    <TestimonialsTimeline people={stAndrewsData} {width} {height} />
   {/if}
 </div>
 
@@ -173,7 +240,7 @@
   #testimonials {
     position: relative;
     width: 100%;
-    height: 300px;
+    height: 80vh;
   }
   #network {
     position: relative;

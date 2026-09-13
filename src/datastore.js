@@ -7,3 +7,7 @@ export function loadPeople() {
 export function loadTestimonials() {
   return json(`${import.meta.env.BASE_URL}md_testimonials.json`);
 }
+
+export function loadStAndrews() {
+  return json(`${import.meta.env.BASE_URL}md_st_andrews.json`);
+}
