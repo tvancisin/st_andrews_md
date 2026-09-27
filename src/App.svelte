@@ -1,5 +1,5 @@
 <script>
-  import { onMount, mount } from "svelte";
+  import { onMount, mount, tick } from "svelte";
   import { groups } from "d3";
   import L from "leaflet";
   import "leaflet/dist/leaflet.css";
@@ -7,7 +7,9 @@
   import PopupTimeline from "./libs/PopupTimeline.svelte";
   import TestimonialsTimeline from "./libs/TestimonialsTimeline.svelte";
   import Network from "./libs/Network.svelte";
+  import ArcDiagram from "./libs/ArcDiagram.svelte";
 
+  //////// NOTES ////////
   // all md (gained in st andrews and elsewhere)
   // just st andrews : 3758
   // just elsewhere : 391 (including Hon. M.D., M.D. et Phil.)
@@ -43,6 +45,8 @@
   const MAX_RADIUS = 30;
 
   let mapEl;
+  let map;
+  let view = "map"; // "map" | "testimonials" | "network" | "arc"
   let status = "Loading…";
   let testimonialsData = null;
   let stAndrewsData = null;
@@ -75,6 +79,23 @@
     return DEGREE_AWARD_ALIASES[degreeAward] || degreeAward;
   }
 
+  // split degree entries into by-examination / on-testimonials / other.
+  // matches on substrings ("examination", "testimonial") rather than exact
+  // phrases so a missing "by"/"on" (e.g. "after examination") still counts;
+  // entries mentioning both examination and testimonials count as examination.
+  function categorizeByAward(entries) {
+    const byExamination = [];
+    const onTestimonials = [];
+    const other = [];
+    entries.forEach((d) => {
+      const award = (d.degree_award || "").toLowerCase();
+      if (award.includes("examination")) byExamination.push(d);
+      else if (award.includes("testimonial")) onTestimonials.push(d);
+      else other.push(d);
+    });
+    return { byExamination, onTestimonials, other };
+  }
+
   // radius grows with sqrt(count) so marker area scales linearly with attendee count
   function radiusFor(count, maxCount) {
     return MIN_RADIUS + (MAX_RADIUS - MIN_RADIUS) * Math.sqrt(count / maxCount);
@@ -105,8 +126,13 @@
     return container;
   }
 
+  // Leaflet caches its size; recompute when the map div is shown again
+  $: if (map && view === "map") {
+    tick().then(() => map.invalidateSize());
+  }
+
   onMount(() => {
-    const map = L.map(mapEl).setView([53.54, -2.8], 6);
+    map = L.map(mapEl).setView([53.54, -2.8], 6);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution:
@@ -118,7 +144,6 @@
     loadPeople()
       .then((people) => {
         // group other_universities entries by official_name
-        console.log(people);
 
         const groups = new Map();
         people.forEach((p) => {
@@ -183,7 +208,6 @@
 
     loadStAndrews()
       .then((stAndrews) => {
-        console.log(stAndrews);
         stAndrewsData = stAndrews;
 
         const degreeEntries = stAndrews.flatMap((p) =>
@@ -194,7 +218,81 @@
         const byDegreeAward = groups(degreeEntries, (d) =>
           normalizeDegreeAward(d.degree_award),
         );
-        console.log(byDegreeAward);
+        const pre_1722 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year < 1722;
+        });
+        const between_1722_1764 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year >= 1722 && year < 1764;
+        });
+        const between_1764_1770 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year >= 1764 && year < 1770;
+        });
+        const between_1770_1811 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year >= 1770 && year < 1811;
+        });
+        const between_1811_1840 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year >= 1811 && year < 1840;
+        });
+        const between_1696_1800 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year >= 1696 && year <= 1800;
+        });
+        const between_1811_1826 = degreeEntries.filter((d) => {
+          if (!d.date) return false;
+          const year = parseInt(d.date.slice(0, 4), 10);
+          return year >= 1811 && year <= 1826;
+        });
+        const pre_1722_awards = categorizeByAward(pre_1722);
+        const between_1722_1764_awards = categorizeByAward(between_1722_1764);
+        const between_1764_1770_awards = categorizeByAward(between_1764_1770);
+        const between_1770_1811_awards = categorizeByAward(between_1770_1811);
+        const between_1811_1840_awards = categorizeByAward(between_1811_1840);
+        const between_1696_1800_awards = categorizeByAward(between_1696_1800);
+        const between_1811_1826_awards = categorizeByAward(between_1811_1826);
+
+        // console.log(stAndrewsData);
+        console.log("pre 1722:", pre_1722, pre_1722_awards);
+        console.log(
+          "between 1722 and 1764:",
+          between_1722_1764,
+          between_1722_1764_awards,
+        );
+        console.log(
+          "between 1764 and 1770:",
+          between_1764_1770,
+          between_1764_1770_awards,
+        );
+        console.log(
+          "between 1770 and 1811:",
+          between_1770_1811,
+          between_1770_1811_awards,
+        );
+        console.log(
+          "between 1811 and 1840:",
+          between_1811_1840,
+          between_1811_1840_awards,
+        );
+        console.log(
+          "between 1696 and 1800:",
+          between_1696_1800,
+          between_1696_1800_awards,
+        );
+        console.log(
+          "between 1811 and 1826:",
+          between_1811_1826,
+          between_1811_1826_awards,
+        );
       })
       .catch((err) => {
         console.error(err);
@@ -211,41 +309,101 @@
   <div id="status">{status}</div>
 </div> -->
 
-<h4>M.D. Degrees Awarded to St Andrews alumni by other universities:</h4>
-<div
-  id="map"
-  bind:this={mapEl}
-  bind:clientWidth={width}
-  bind:clientHeight={height}
-></div>
-<h4>M.D. Degrees Awarded in St Andrews per year:</h4>
-<div id="testimonials">
-  {#if stAndrewsData}
-    <TestimonialsTimeline people={stAndrewsData} {width} {height} />
-  {/if}
+<div id="app-layout">
+  <nav id="view-buttons">
+    <button class:active={view === "map"} on:click={() => (view = "map")}>
+      Other Universities MD
+    </button>
+    <button
+      class:active={view === "testimonials"}
+      on:click={() => (view = "testimonials")}
+    >
+      St Andrews MD
+    </button>
+    <!-- <button
+      class:active={view === "network"}
+      on:click={() => (view = "network")}
+    >
+      Examiners
+    </button> -->
+    <button class:active={view === "arc"} on:click={() => (view = "arc")}>
+      Examiner Arcs
+    </button>
+  </nav>
+
+  <div id="views">
+    <div
+      id="map"
+      class:hidden={view !== "map"}
+      bind:this={mapEl}
+      bind:clientWidth={width}
+      bind:clientHeight={height}
+    ></div>
+    <div id="testimonials" class:hidden={view !== "testimonials"}>
+      {#if stAndrewsData}
+        <TestimonialsTimeline people={stAndrewsData} {width} {height} />
+      {/if}
+    </div>
+    <!-- <div id="network" class:hidden={view !== "network"}>
+      {#if testimonialsData}
+        <Network people={testimonialsData} />
+      {/if}
+    </div> -->
+    <div id="arc" class:hidden={view !== "arc"}>
+      {#if testimonialsData}
+        <ArcDiagram people={testimonialsData} />
+      {/if}
+    </div>
+  </div>
 </div>
 
-<!-- <div id="network">
-  {#if testimonialsData}
-    <Network people={testimonialsData} />
-  {/if}
-</div> -->
-
 <style>
-  #map {
+  #app-layout {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+  }
+  #view-buttons {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    flex: none;
+  }
+  #view-buttons button {
+    padding: 6px 14px;
+    border: 1px solid #1c3d5a;
+    border-radius: 4px;
+    background: #fff;
+    color: #1c3d5a;
+    font: inherit;
+    cursor: pointer;
+  }
+  #view-buttons button.active {
+    background: #1c3d5a;
+    color: #fff;
+  }
+  #views {
     position: relative;
+    flex: 1;
+    min-height: 0;
     width: 100%;
-    height: 70vh;
+  }
+  #map,
+  #testimonials,
+  #network,
+  #arc {
+    position: absolute;
+    inset: 0;
   }
   #testimonials {
-    position: relative;
-    width: 100%;
-    height: 80vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 12px;
+    box-sizing: border-box;
   }
-  #network {
-    position: relative;
-    width: 100%;
-    height: 300px;
+  .hidden {
+    display: none !important;
   }
   #toolbar {
     height: 48px;

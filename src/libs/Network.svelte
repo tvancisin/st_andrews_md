@@ -1,99 +1,30 @@
 <script>
-  import { onMount } from "svelte";
   import {
     forceSimulation,
     forceManyBody,
     forceLink,
-    forceCenter,
+    forceX,
+    forceY,
     forceCollide,
     scaleLinear,
-    zoom as d3zoom,
-    zoomIdentity,
-    select,
   } from "d3";
+  import { buildExaminerGraph } from "./examinerGraph.js";
 
   export let people = [];
 
-  const MAX_COMBINATIONS = 50;
   const NODE_RADIUS = 6;
   const NODE_COLOR = "#1c3d5a";
   const LINK_COLOR = "#999";
+  const CENTER_STRENGTH = 0.04;
 
   let containerWidth = 0;
   let containerHeight = 0;
   let simNodes = [];
   let simLinks = [];
   let simulation = null;
-  let svgEl;
-  let zoomTransform = zoomIdentity;
   let examinerFilter = "";
 
-  // normalize e.g. "M.D.", "MD", "m d" -> "md" for comparison
-  function isMD(degreeName) {
-    if (!degreeName) return false;
-    return degreeName.replace(/[.\s]/g, "").toLowerCase() === "md";
-  }
-
-  // group M.D. degree records by the exact combination of co-examiners (order-independent)
-  $: examinerCombinationGroups = (() => {
-    const byCombination = new Map();
-    people.forEach((p) => {
-      (p.study?.degrees || []).forEach((d) => {
-        if (!isMD(d.name)) return;
-        const names = (d.examiners || [])
-          .filter((ex) => ex.forename && ex.surname)
-          .map((ex) => `${ex.forename} ${ex.surname}`)
-          .sort();
-        if (names.length === 0) return;
-        const key = names.join(" & ");
-        if (!byCombination.has(key)) {
-          byCombination.set(key, { examiners: names, records: [] });
-        }
-        byCombination.get(key).records.push({ person: p, degree: d });
-      });
-    });
-    return Array.from(byCombination.values())
-      .sort((a, b) => b.records.length - a.records.length)
-      .slice(0, MAX_COMBINATIONS);
-  })();
-
-  // only keep groups containing an examiner whose name matches the typed filter
-  $: filteredCombinationGroups = examinerFilter.trim()
-    ? examinerCombinationGroups.filter((group) =>
-        group.examiners.some((name) =>
-          name.toLowerCase().includes(examinerFilter.trim().toLowerCase()),
-        ),
-      )
-    : examinerCombinationGroups;
-
-  // one node per examiner, one edge per co-examiner pair (weighted by shared examinations)
-  $: graph = (() => {
-    const nodeByName = new Map();
-    const linkByPair = new Map();
-
-    filteredCombinationGroups.forEach((group) => {
-      group.examiners.forEach((name) => {
-        if (!nodeByName.has(name)) nodeByName.set(name, { id: name, count: 0 });
-        nodeByName.get(name).count += group.records.length;
-      });
-
-      for (let i = 0; i < group.examiners.length; i++) {
-        for (let j = i + 1; j < group.examiners.length; j++) {
-          const [a, b] = [group.examiners[i], group.examiners[j]].sort();
-          const key = `${a}|${b}`;
-          if (!linkByPair.has(key)) {
-            linkByPair.set(key, { source: a, target: b, weight: 0 });
-          }
-          linkByPair.get(key).weight += group.records.length;
-        }
-      }
-    });
-
-    return {
-      nodes: Array.from(nodeByName.values()),
-      links: Array.from(linkByPair.values()),
-    };
-  })();
+  $: graph = buildExaminerGraph(people, examinerFilter);
 
   const MAX_EDGE_WEIGHT = 16;
   $: linkWidthScale = scaleLinear()
@@ -106,10 +37,21 @@
     .range([0.25, 1])
     .clamp(true);
 
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
   function runSimulation() {
     // d3-force mutates node/link objects in place, so clone to avoid mutating `graph`
     simNodes = graph.nodes.map((n) => ({ ...n }));
     simLinks = graph.links.map((l) => ({ ...l }));
+
+    // size the forces to the available area so the layout fits instead of
+    // being pushed against (and clamped at) the container edges
+    const spacing = Math.sqrt(
+      (containerWidth * containerHeight) / simNodes.length,
+    );
+    const aspect = containerWidth / containerHeight;
 
     if (simulation) simulation.stop();
     simulation = forceSimulation(simNodes)
@@ -117,12 +59,38 @@
         "link",
         forceLink(simLinks)
           .id((d) => d.id)
-          .distance(50),
+          .distance(clamp(spacing * 0.5, 20, 120)),
       )
-      .force("charge", forceManyBody().strength(-120))
-      .force("center", forceCenter(containerWidth / 2, containerHeight / 2))
+      .force(
+        "charge",
+        forceManyBody()
+          .strength(-spacing)
+          .distanceMax(spacing * 4),
+      )
+      // pull toward the center, more strongly along the shorter axis
+      .force(
+        "x",
+        forceX(containerWidth / 2).strength(
+          CENTER_STRENGTH * Math.min(1, 1 / aspect),
+        ),
+      )
+      .force(
+        "y",
+        forceY(containerHeight / 2).strength(
+          CENTER_STRENGTH * Math.min(1, aspect),
+        ),
+      )
       .force("collide", forceCollide(NODE_RADIUS + 2))
       .on("tick", () => {
+        // hard limit: keep every node (including its radius) inside the container
+        simNodes.forEach((n) => {
+          const x = clamp(n.x, NODE_RADIUS, containerWidth - NODE_RADIUS);
+          const y = clamp(n.y, NODE_RADIUS, containerHeight - NODE_RADIUS);
+          if (x !== n.x) n.vx = 0;
+          if (y !== n.y) n.vy = 0;
+          n.x = x;
+          n.y = y;
+        });
         simNodes = simNodes;
         simLinks = simLinks;
       });
@@ -137,19 +105,6 @@
       simLinks = [];
     }
   }
-
-  onMount(() => {
-    // d3-zoom needs a real DOM node to attach wheel/drag listeners to; the
-    // resulting transform is stored and applied declaratively in the template
-    const zoomBehavior = d3zoom()
-      .scaleExtent([0.2, 5])
-      .on("zoom", (event) => {
-        zoomTransform = event.transform;
-      });
-    select(svgEl).call(zoomBehavior);
-
-    return () => simulation?.stop();
-  });
 </script>
 
 <div
@@ -163,10 +118,8 @@
     placeholder="Filter by examiner name…"
     bind:value={examinerFilter}
   />
-  <svg bind:this={svgEl} width={containerWidth} height={containerHeight}>
-    <g
-      transform="translate({zoomTransform.x},{zoomTransform.y}) scale({zoomTransform.k})"
-    >
+  <svg width={containerWidth} height={containerHeight}>
+    <g>
       {#each simLinks as link (link.source.id + "|" + link.target.id)}
         <line
           x1={link.source.x}
@@ -208,7 +161,7 @@
   .network {
     position: relative;
     width: 100%;
-    height: 100vh;
+    height: 100%;
   }
   .examiner-filter {
     position: absolute;
@@ -219,13 +172,6 @@
     font-size: 12px;
     border: 1px solid #ccc;
     border-radius: 4px;
-  }
-  .network svg {
-    cursor: grab;
-    touch-action: none;
-  }
-  .network svg:active {
-    cursor: grabbing;
   }
   .node-label {
     font-size: 10px;
