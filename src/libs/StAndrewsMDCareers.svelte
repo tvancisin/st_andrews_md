@@ -72,7 +72,63 @@
         );
     }
 
-    $: countryCounts = stAndrewsData ? countByCountry(stAndrewsData) : [];
+    // selected period, bounded by the earliest/latest floruit "from" year
+    let minYear = 0;
+    let maxYear = 0;
+    let yearFrom = 0;
+    let yearTo = 0;
+    let yearsReady = false;
+
+    function yearOf(f) {
+        const year = parseInt(f && f.from, 10);
+        return Number.isFinite(year) ? year : null;
+    }
+
+    $: if (stAndrewsData && !yearsReady) {
+        const years = stAndrewsData
+            .flatMap((p) => (Array.isArray(p.floruit) ? p.floruit : []))
+            .map(yearOf)
+            .filter((y) => y !== null);
+        if (years.length) {
+            minYear = Math.min(...years);
+            maxYear = Math.max(...years);
+            yearFrom = minYear;
+            yearTo = maxYear;
+            yearsReady = true;
+        }
+    }
+
+    // keep the two handles from crossing
+    function onFromInput() {
+        if (yearFrom > yearTo) yearFrom = yearTo;
+    }
+    function onToInput() {
+        if (yearTo < yearFrom) yearTo = yearFrom;
+    }
+
+    $: fullRange = yearFrom === minYear && yearTo === maxYear;
+
+    // people with their floruit narrowed to the selected period. Entries
+    // without a year, and people without any floruit, only show for the
+    // full period.
+    $: filteredPeople = !stAndrewsData
+        ? []
+        : !yearsReady || fullRange
+          ? stAndrewsData
+          : stAndrewsData
+                .filter((p) => Array.isArray(p.floruit) && p.floruit.length)
+                .map((p) => ({
+                    ...p,
+                    floruit: p.floruit.filter((f) => {
+                        const year = yearOf(f);
+                        return (
+                            year !== null && year >= yearFrom && year <= yearTo
+                        );
+                    }),
+                }))
+                .filter((p) => p.floruit.length);
+
+    $: countryCounts = countByCountry(filteredPeople);
 
     function personName(p) {
         return [p.forename, p.surname].filter(Boolean).join(" ") || "Unknown";
@@ -142,9 +198,9 @@
         tick().then(() => map.invalidateSize());
     }
 
-    $: if (markerLayer && stAndrewsData) {
+    $: if (markerLayer && filteredPeople) {
         markerLayer.clearLayers();
-        const groups = groupByLocation(stAndrewsData);
+        const groups = groupByLocation(filteredPeople);
         const maxCount = Math.max(
             ...Array.from(groups.values()).map((g) => g.entries.length),
             1,
@@ -185,6 +241,37 @@
 
 <div class="wrapper" bind:clientHeight={height}>
     <div class="map" bind:this={mapEl}></div>
+    {#if yearsReady}
+        <div class="year-slider">
+            <span class="year-label">{yearFrom}</span>
+            <div class="track">
+                <div
+                    class="range"
+                    style="left: {((yearFrom - minYear) /
+                        (maxYear - minYear || 1)) *
+                        100}%; right: {100 -
+                        ((yearTo - minYear) / (maxYear - minYear || 1)) * 100}%"
+                ></div>
+                <input
+                    type="range"
+                    min={minYear}
+                    max={maxYear}
+                    bind:value={yearFrom}
+                    on:input={onFromInput}
+                    aria-label="From year"
+                />
+                <input
+                    type="range"
+                    min={minYear}
+                    max={maxYear}
+                    bind:value={yearTo}
+                    on:input={onToInput}
+                    aria-label="To year"
+                />
+            </div>
+            <span class="year-label">{yearTo}</span>
+        </div>
+    {/if}
     <div class="panel" style="width: 250px; height: {height}px;">
         <h2>Careers by country</h2>
         <ol>
@@ -206,6 +293,86 @@
     .map {
         width: 100%;
         height: 100%;
+    }
+    .year-slider {
+        position: absolute;
+        bottom: 24px;
+        left: 80px;
+        right: 274px;
+        max-width: 700px;
+        margin: 0 auto;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 14px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #1c3d5a;
+        border-radius: 4px;
+        font-size: 13px;
+        color: #1c3d5a;
+    }
+    .year-label {
+        min-width: 36px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+    .track {
+        position: relative;
+        flex: 1;
+        height: 20px;
+    }
+    .track::before,
+    .range {
+        content: "";
+        position: absolute;
+        top: 8px;
+        height: 4px;
+        border-radius: 2px;
+    }
+    .track::before {
+        left: 0;
+        right: 0;
+        background: #c5ced6;
+    }
+    .range {
+        background: #1c3d5a;
+    }
+    /* two overlaid inputs; only the thumbs receive pointer events */
+    .track input[type="range"] {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        margin: 0;
+        background: none;
+        pointer-events: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    .track input[type="range"]::-webkit-slider-runnable-track {
+        background: none;
+    }
+    .track input[type="range"]::-moz-range-track {
+        background: none;
+    }
+    .track input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        pointer-events: auto;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #1c3d5a;
+        border: 2px solid #fff;
+        cursor: pointer;
+    }
+    .track input[type="range"]::-moz-range-thumb {
+        pointer-events: auto;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #1c3d5a;
+        border: 2px solid #fff;
+        cursor: pointer;
     }
     .panel {
         position: absolute;
