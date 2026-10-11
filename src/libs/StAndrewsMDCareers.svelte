@@ -7,6 +7,8 @@
     // true while this view is visible; Leaflet needs a size recompute on show
     export let active = true;
 
+    $: console.log(stAndrewsData);
+
     const MARKER_COLOR = "black";
     const MIN_RADIUS = 2;
     const MAX_RADIUS = 15;
@@ -14,6 +16,63 @@
     let mapEl;
     let map;
     let markerLayer;
+    let height = 0;
+
+    const countryNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+    function countryName(code) {
+        if (!code) return "Unknown";
+        try {
+            return countryNames.of(code);
+        } catch {
+            return code;
+        }
+    }
+
+    const NO_FLORUIT = "No career recorded";
+    const NO_LOCATION = "Location missing";
+    const NO_COUNTRY = "Country missing";
+
+    // original_name values (used when a location has no country) that should
+    // be counted under a different row
+    const REGION_ALIASES = {
+        "General hospital, North America": "North America",
+        "Leeward Islands": "West Indies",
+    };
+
+    // number of floruit entries per country, most to least. People without a
+    // floruit (missing, null or empty) are counted once under NO_FLORUIT.
+    function countByCountry(people) {
+        const counts = new Map();
+        const add = (name) => counts.set(name, (counts.get(name) || 0) + 1);
+        const missingCountry = [];
+        people.forEach((p) => {
+            if (!Array.isArray(p.floruit) || p.floruit.length === 0) {
+                add(NO_FLORUIT);
+                return;
+            }
+            p.floruit.forEach((f) => {
+                if (!f || !f.location) add(NO_LOCATION);
+                else if (!f.location.country) {
+                    const name = f.location.original_name;
+                    add(REGION_ALIASES[name] || name || NO_COUNTRY);
+                    missingCountry.push({
+                        person: personName(p),
+                        location: f.location,
+                    });
+                } else add(countryName(f.location.country));
+            });
+        });
+        console.log(
+            `${NO_COUNTRY}: ${missingCountry.length} entries`,
+            missingCountry,
+        );
+        return Array.from(counts, ([name, count]) => ({ name, count })).sort(
+            (a, b) => b.count - a.count || a.name.localeCompare(b.name),
+        );
+    }
+
+    $: countryCounts = stAndrewsData ? countByCountry(stAndrewsData) : [];
 
     function personName(p) {
         return [p.forename, p.surname].filter(Boolean).join(" ") || "Unknown";
@@ -123,11 +182,59 @@
     });
 </script>
 
-<div class="map" bind:this={mapEl}></div>
+<div class="wrapper" bind:clientHeight={height}>
+    <div class="map" bind:this={mapEl}></div>
+    <div class="panel" style="width: 250px; height: {height}px;">
+        <h2>Careers by country</h2>
+        <ol>
+            {#each countryCounts as c}
+                <li>
+                    <span class="name">{c.name}</span><span>{c.count}</span>
+                </li>
+            {/each}
+        </ol>
+    </div>
+</div>
 
 <style>
+    .wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
     .map {
         width: 100%;
         height: 100%;
+    }
+    .panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: 1000; /* above Leaflet panes */
+        box-sizing: border-box;
+        padding: 8px 12px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.92);
+        font-size: 13px;
+    }
+    .panel h2 {
+        margin: 0 0 6px;
+        font-size: 14px;
+    }
+    .panel ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .panel li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 2px 0;
+    }
+    .panel .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 </style>
