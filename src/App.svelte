@@ -127,18 +127,24 @@
 
 <style>
   #app-layout {
-    display: flex;
-    flex-direction: column;
+    --nav-height: 48px;
+    position: relative;
     width: 100vw;
     height: 100vh;
   }
+  /* buttons float over the full-height views */
   #view-buttons {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1000;
     display: flex;
     gap: 8px;
     padding: 8px 12px;
-    flex: none;
+    pointer-events: none;
   }
   #view-buttons button {
+    pointer-events: auto;
     padding: 6px 14px;
     border: 1px solid #1c3d5a;
     border-radius: 4px;
@@ -152,10 +158,8 @@
     color: #fff;
   }
   #views {
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    width: 100%;
+    position: absolute;
+    inset: 0;
   }
   #map,
   #testimonials,
@@ -164,6 +168,12 @@
   #arc {
     position: absolute;
     inset: 0;
+  }
+  /* non-map views sit below the floating buttons */
+  #testimonials,
+  #network,
+  #arc {
+    top: var(--nav-height);
   }
   #testimonials {
     display: flex;

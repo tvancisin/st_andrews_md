@@ -61,12 +61,13 @@
   }
 
   onMount(() => {
-    map = L.map(mapEl).setView([53.54, -2.8], 6);
+    map = L.map(mapEl, { zoomControl: false }).setView([53.54, -2.8], 6);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
+        L.control.zoom({ position: "bottomleft" }).addTo(map);
 
     const markerLayer = L.layerGroup().addTo(map);
 
