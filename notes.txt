@@ -1,0 +1,115 @@
+  //////// NOTES ////////
+  // all md (gained in st andrews and elsewhere)
+  // just st andrews : 3758
+  // just elsewhere : 391 (including Hon. M.D., M.D. et Phil.)
+  // idp1379293124
+  // idp1393191556
+  // idp1374816476
+  // idp1374916524
+  // idp1407537140
+  // idp1412748908
+  // idp1395590356
+  // idp1388412484
+  // idp1417348676
+  // idp1388840492
+  // W_0127_Watson_John_WatsonusWatsone.xml
+  //                  380 (just M.D.)
+
+  // Degree Award Type	Count
+  // By examination	2,427
+  // On testimonials	1,191
+  // Unspecified	75
+  // Gratis	23
+  // Gratis and on testimonials	12
+  // By examination and on testimonials	12
+  // By examination and gratis	5
+  // Honorary	8
+  // On recommendation	2
+  // By thesis	1
+  // In eundem	1
+  // On personal knowledge and testimonial	1
+
+
+        //   const degreeEntries = stAndrews.flatMap((p) =>
+        //     ((p.study && p.study.degrees) || [])
+        //       .filter((d) => isMD(d.name))
+        //       .map((d) => ({ ...d, person: p })),
+        //   );
+        //   const byDegreeAward = groups(degreeEntries, (d) =>
+        //     normalizeDegreeAward(d.degree_award),
+        //   );
+        //   const pre_1722 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year < 1722;
+        //   });
+        //   const between_1722_1764 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year >= 1722 && year < 1764;
+        //   });
+        //   const between_1764_1770 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year >= 1764 && year < 1770;
+        //   });
+        //   const between_1770_1811 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year >= 1770 && year < 1811;
+        //   });
+        //   const between_1811_1840 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year >= 1811 && year < 1840;
+        //   });
+        //   const between_1696_1800 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year >= 1696 && year <= 1800;
+        //   });
+        //   const between_1811_1826 = degreeEntries.filter((d) => {
+        //     if (!d.date) return false;
+        //     const year = parseInt(d.date.slice(0, 4), 10);
+        //     return year >= 1811 && year <= 1826;
+        //   });
+        //   const pre_1722_awards = categorizeByAward(pre_1722);
+        //   const between_1722_1764_awards = categorizeByAward(between_1722_1764);
+        //   const between_1764_1770_awards = categorizeByAward(between_1764_1770);
+        //   const between_1770_1811_awards = categorizeByAward(between_1770_1811);
+        //   const between_1811_1840_awards = categorizeByAward(between_1811_1840);
+        //   const between_1696_1800_awards = categorizeByAward(between_1696_1800);
+        //   const between_1811_1826_awards = categorizeByAward(between_1811_1826);
+
+        //   // console.log(stAndrewsData);
+        //   console.log("pre 1722:", pre_1722, pre_1722_awards);
+        //   console.log(
+        //     "between 1722 and 1764:",
+        //     between_1722_1764,
+        //     between_1722_1764_awards,
+        //   );
+        //   console.log(
+        //     "between 1764 and 1770:",
+        //     between_1764_1770,
+        //     between_1764_1770_awards,
+        //   );
+        //   console.log(
+        //     "between 1770 and 1811:",
+        //     between_1770_1811,
+        //     between_1770_1811_awards,
+        //   );
+        //   console.log(
+        //     "between 1811 and 1840:",
+        //     between_1811_1840,
+        //     between_1811_1840_awards,
+        //   );
+        //   console.log(
+        //     "between 1696 and 1800:",
+        //     between_1696_1800,
+        //     between_1696_1800_awards,
+        //   );
+        //   console.log(
+        //     "between 1811 and 1826:",
+        //     between_1811_1826,
+        //     between_1811_1826_awards,
+        //   );
