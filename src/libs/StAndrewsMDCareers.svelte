@@ -161,6 +161,14 @@
         return groups;
     }
 
+    // Keep the marker-size reference stable while the selected years change.
+    // This includes every mappable floruit record, not just the active filter.
+    $: allLocationGroups = groupByLocation(stAndrewsData || []);
+    $: maxLocationCount = Math.max(
+        ...Array.from(allLocationGroups.values()).map((g) => g.entries.length),
+        1,
+    );
+
     function popupFor(name, entries) {
         const container = document.createElement("div");
 
@@ -201,17 +209,13 @@
     $: if (markerLayer && filteredPeople) {
         markerLayer.clearLayers();
         const groups = groupByLocation(filteredPeople);
-        const maxCount = Math.max(
-            ...Array.from(groups.values()).map((g) => g.entries.length),
-            1,
-        );
         groups.forEach((group) => {
             const name =
                 group.loc.official_name || group.loc.original_name || "Unknown";
             const marker = L.circleMarker(
                 [group.loc.latitude, group.loc.longitude],
                 {
-                    radius: radiusFor(group.entries.length, maxCount),
+                    radius: radiusFor(group.entries.length, maxLocationCount),
                     color: MARKER_COLOR,
                     fillColor: MARKER_COLOR,
                     fillOpacity: 0.6,
